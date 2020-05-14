@@ -59,7 +59,7 @@ IPAddress eosIP(10, 101, 1, 100);
 uint16_t eosPort = 8000; // on this port EOS listen for data
 // in EOS Setup > System > Showcontrol > OSC > OSC UDP RX Port
 ```
-3. You need an EOS and UDP constructor, must done befor setup(), don't change the name of the constructor
+3. You need an EOS and UDP constructor, must done before setup(), don't change the name of the constructor
 ```
 EthernetUDP udp;
 EOS eos(udp, eosIP, eosPort);
