@@ -29,52 +29,53 @@ THE SOFTWARE.
 #include <LiquidCrystal.h>
 #include <OSCMessage.h>
 #include "eOS.h"
-#include "Ethernet3.h"
-#include "EthernetUdp3.h"
 
+#ifdef BOARD_HAS_USB_SERIAL
+	#include <SLIPEncodedUSBSerial.h>
+	SLIPEncodedUSBSerial SLIPSerial(thisBoardsSerialUSB);
+#else
+	#include <SLIPEncodedSerial.h>
+	SLIPEncodedSerial SLIPSerial(Serial);
+#endif
 
-// Hardware pins
-#define LCD_RS				2
-#define LCD_ENABLE		3
-#define LCD_D4				4
-#define LCD_D5				5
-#define LCD_D6				6
-#define LCD_D7				7
+// constants and macros
+#define LCD_CHARS				16
+#define LCD_LINES				2
+
+#define LCD_RS					2
+#define LCD_ENABLE			3
+#define LCD_D4					4
+#define LCD_D5					5
+#define LCD_D6					6
+#define LCD_D7					7
 
 #define ENC_1_A					A0
 #define ENC_1_B					A1
 #define ENC_2_A					A2
 #define ENC_2_B					A3
-#define ENC_1_BTN				A4
-#define ENC_2_BTN				A5
 
-#define PARAM_UP_BTN		A8
-#define PARAM_DOWN_BTN	A9
-#define SEL_LAST_BTN		A10
+#define PARAM_UP_BTN		8
+#define PARAM_DOWN_BTN	9
+#define SHIFT_BTN				10
 
-#define GO_BTN					A11
-#define BACK_BTN				A12
-#define SHIFT_BTN				A13
 
-// constants and macros
-#define LCD_CHARS				20
-#define LCD_LINES				4
+#define SIG_DIGITS			3 // Number of significant digits displayed
+
+// number of encoders you use
+#define ENCODERS				2
+#define PARAMETER_MAX		14 // number of parameters must even
 
 #define UP							0
 #define DOWN						1
 
-#define SIG_DIGITS			3 // Number of significant digits displayed
-
-#define ENCODERS				2 // number of encoders you use
-#define PARAMETER_MAX		26 // 14 for UNO, number of parameters must even
-
 const String HANDSHAKE_QUERY = "ETCOSC?";
 const String HANDSHAKE_REPLY = "OK";
-const String PING_QUERY = "box_x_eth_hello";
+const String PING_QUERY = "box2a_hello";
 const String PARAMETER_QUERY = "/eos/out/param/";
+const String NO_PARAMETER = "none"; // none is a keyword used when there is no parameter
 
 // See displayScreen() below - limited to 10 chars (after 6 prefix chars)
-const String VERSION_STRING = "1.0.0.0";
+const String VERSION_STRING = "2.0.0.0";
 
 // Change these values to alter how long we wait before sending an OSC ping
 // to see if Eos is still there, and then finally how long before we
@@ -83,58 +84,12 @@ const String VERSION_STRING = "1.0.0.0";
 #define PING_AFTER_IDLE_INTERVAL		2500
 #define TIMEOUT_AFTER_IDLE_INTERVAL	5000
 
-// Definition of the parameter you want to use
-const String NO_PARAMETER = "none"; // none is a keyword used when there is no parameter
-int8_t idx = 0; // start with parameter index 2 must even
-
-// Network config
-uint8_t mac[] = {0x90, 0xA2, 0xDA, 0x10, 0x14, 0x48};
-IPAddress localIP(10, 101, 1, 201);
-IPAddress subnet(255, 255, 0, 0);
-uint16_t localPort = 8001;
-IPAddress eosIP(10, 101, 1, 100);
-uint16_t eosPort = 8000;
-
 // Global variables
 bool updateDisplay = false;
 bool connectedToEos = false;
 unsigned long lastMessageRxTime = 0;
 bool timeoutPingSent = false;
-
-// special chars
-uint8_t upArrow[8] = {  
-  B00100,
-  B01010,
-  B10001,
-  B00100,
-  B00100,
-  B00100,
-	B00000,
-	};
-
-uint8_t downArrow[8] = {
-	B00000,
-  B00100,
-  B00100,
-  B00100,
-  B10001,
-  B01010,
-  B00100,
-	};
-
-struct CueData {
-  String cuelist;
-  String cue;
-  String label;
-  String duration;
-  String progress;
-  }activeCue, pendingCue;
-
-struct ControlButton {
-	uint8_t function;
-	uint8_t pin;
-	uint8_t last;
-	} parameterUp, parameterDown;
+int8_t idx = 0; // start with parameter index 2 must even
 
 /**
  * @brief Parameter structure
@@ -160,85 +115,49 @@ struct Parameter parameter[PARAMETER_MAX] = {
 	{"Edge"},
 	{"Iris"},
 	{"Diffusn"},
+	//{"Hue"},
+	//{"Saturatn"},
 	{"Red"},
 	{"Green"},
 	{"Blue"},
 	{"Cyan"},
 	{"Magenta"},
 	{"Yellow"},
-	// foloowing parameters only for Arduino MEGA
-	{"Hue"},
-	{"Saturatn"},
-	{"cto", "CTO"},
-	{"Frame Assembly", "Assembly"},
-	{"Thrust A"},
-	{"Angle A"},
-	{"Thrust B"},
-	{"Angle B"},
-	{"Thrust C"},
-	{"Angle C"},
-	{"Thrust D"},
-	{"Angle D"},
+	//{"cto", "CTO"},
+	//{"frame_assembly", "Assembly"},
+	//{"thrust_A", "ThrustA"},
+	//{"angle_A", "AngleA"},
+	//{"thrust_B", "ThrustB"},
+	//{"thrust_B", "AngleB"},
+	//{"thrust_C", "ThrustC"},
+	//{"angle_C", "AngleC"},
+	//{"thrust_D", "ThrustD"},
+	//{"angle_D", "AngleD"}
 	};
 
-// Hardware constructors
-EthernetUDP udp;
-EOS eos(udp, eosIP, eosPort);
+struct ControlButton {
+	uint8_t function;
+	uint8_t pin;
+	uint8_t last;
+	} parameterUp, parameterDown;
 
+// Hardware constructors
+EOS eos;
 LiquidCrystal lcd(LCD_RS, LCD_ENABLE, LCD_D4, LCD_D5, LCD_D6, LCD_D7); // rs, enable, d4, d5, d6, d7
 
-Key selectLast(SEL_LAST_BTN, "SELECT_LAST");
-Key go(GO_BTN, "GO_0");
-Key back(BACK_BTN, "STOP");
 Encoder encoder1(ENC_1_A, ENC_1_B, FORWARD);
 Encoder encoder2(ENC_2_A, ENC_2_B, FORWARD);
 
 // Local functions
 
 /**
- * @brief Parser for cue text
- * 
- * @param data 
- * @param msg 
- */
-void parseCueMessage(struct CueData *data, String msg) {
-  uint8_t size = msg.length();
-  uint8_t firstSpace = msg.indexOf(" ");
-  uint8_t cueSeparator = msg.indexOf("/");
-  uint8_t lastSpace = msg.lastIndexOf(" ");
-  
-  if (cueSeparator < firstSpace && cueSeparator != 0) { // there is an cue separator
-    data->cuelist = msg.substring(0, cueSeparator);
-    data->cue = msg.substring(cueSeparator + 1, firstSpace);
-    }
-  else {
-    data->cuelist = String();
-    data->cue = msg.substring(0, firstSpace);
-    }
-  
-  if (msg[size - 1] == '%') { // check if active or peding cue, only active cues have a progress counter in %
-    data->progress = msg.substring(lastSpace + 1);
-    uint8_t durSpace = msg.lastIndexOf(" ", lastSpace - 1);
-    data->duration = msg.substring(durSpace + 1, lastSpace);
-    data->label = msg.substring(firstSpace + 1, durSpace);
-    }
-  else {
-    data->progress = String();
-    data->duration = msg.substring(lastSpace + 1);
-    data->label = msg.substring(firstSpace + 1, lastSpace);
-    }
-  }
-
-/**
- * @brief Init the console, gives back a handshake reply
- * and send the filters and subscribtions.
+ * @brief Init the console, gives back a handshake reply and send the filters and subscribtions.
  *
  */
 void initEOS() {
+	SLIPSerial.print(HANDSHAKE_REPLY);
 	filter("/eos/out/param/*");
 	filter("/eos/out/ping");
-	filter("/eos/out/active/cue/text");
-	filter("/eos/out/pending/cue/text");
 	subscribe(parameter[idx].name);
 	subscribe(parameter[idx + 1].name);
 	}
@@ -254,67 +173,67 @@ void parameterUpdate() {
 	}
 
 /**
- * @brief Get the text message of the active cue
+ * @brief Updates the display with the latest parameter values.
  * 
- * @param msg OSC message
- * @param addressOffset 
  */
-void activeCueUpdate(OSCMessage& msg, int addressOffset) {
-	char text[msg.getDataLength(0)];
-	msg.getString(0, text);
-	parseCueMessage(&activeCue, text);
-	connectedToEos = true;
-	updateDisplay = true; 
+void displayStatus() {
+	lcd.clear();
+	if (!connectedToEos) { // display a splash message before the Eos connection is open
+		lcd.setCursor(0, 0);
+		lcd.print(String("Box2A v" + VERSION_STRING).c_str());
+		lcd.setCursor(0, 1);
+		lcd.print("waiting for EOS");
+		}
+	else {
+		lcd.setCursor(0, 0);
+		if (parameter[idx].displayName == 0) lcd.print(parameter[idx].name);
+		else lcd.print(parameter[idx].displayName);
+		lcd.setCursor(8, 0);
+		if (parameter[idx + 1].displayName == 0) lcd.print(parameter[idx + 1].name);
+		else lcd.print(parameter[idx + 1].displayName);
+		lcd.setCursor(0, 1);
+		lcd.print(parameter[idx].value, SIG_DIGITS);
+		lcd.setCursor(8, 1);
+		lcd.print(parameter[idx + 1].value, SIG_DIGITS);
+		}
+	updateDisplay = false;
 	}
 
 /**
- * @brief Get the text message of the pending cue
- * 
- * @param msg OSC message
- * @param addressOffset 
- */
-void pendingCueUpdate(OSCMessage& msg, int addressOffset) {
-	char text[msg.getDataLength(0)];
-	msg.getString(0, text);
-	parseCueMessage(&pendingCue, text);
-	connectedToEos = true;
-	updateDisplay = true;
-	}
-
-/**
- * @brief 
- * Given an unknown OSC message we check to see if it's a handshake message.
- * If it's a handshake we issue a subscribe, otherwise we begin route the OSC
- * message to the appropriate function.
+ * @brief Given an unknown OSC message we check to see if it's a handshake message.
+ * If it's a handshake we issue the init, otherwise we update the parameters values.
  * 
  * @param msg - the OSC message of unknown importance
  *
  */
 void parseOSCMessage(String& msg) {
-	// Prepare the message for routing by filling an OSCMessage object with our message string
 	static String parseMsg;
-	OSCMessage oscmsg;
-	oscmsg.fill((uint8_t*)msg.c_str(), (int)msg.length());
-	parseMsg = PARAMETER_QUERY + parameter[idx].name;
-	if (msg.indexOf(parseMsg) != -1) {
-		parameter[idx].value = oscmsg.getFloat(0);
+	if (msg.indexOf(HANDSHAKE_QUERY) != -1) { // Check to see if this is the handshake string
+		initEOS();
 		connectedToEos = true;
 		updateDisplay = true;
-		parseMsg = String();
 		return;
 		}
-	parseMsg = String();
-	parseMsg = PARAMETER_QUERY + parameter[idx + 1].name;
-	if (msg.indexOf(parseMsg) != -1) {
-		parameter[idx + 1].value = oscmsg.getFloat(0);
-		connectedToEos = true;
-		updateDisplay = true;
-		parseMsg = String();
-		return;
+	else {
+		OSCMessage oscmsg;
+		oscmsg.fill((uint8_t*)msg.c_str(), (int)msg.length());
+		parseMsg = PARAMETER_QUERY + parameter[idx].name;
+		if (msg.indexOf(parseMsg) != -1) {
+				parameter[idx].value = oscmsg.getFloat(0);
+				connectedToEos = true;
+				updateDisplay = true;
+				parseMsg = String();
+				return;
+				}
+		parseMsg = PARAMETER_QUERY + parameter[idx + 1].name;
+		if (msg.indexOf(parseMsg) != -1) {
+			parameter[idx + 1].value = oscmsg.getFloat(0);
+			connectedToEos = true;
+			updateDisplay = true;
+			parseMsg = String();
+			return;
+			}
 		}
-	// Route cue messages to the relevant update function
-	oscmsg.route("/eos/out/active/cue/text", activeCueUpdate);
-	oscmsg.route("/eos/out/pending/cue/text", pendingCueUpdate);
 	}
 
 /**
@@ -371,56 +290,7 @@ void updateControlButton(struct ControlButton* button) {
 	}
 
 /**
- * @brief 
- * Updates the display with the latest parameter values.
- * 
- */
-void displayStatus() {
-	lcd.clear();
-
-	if (!connectedToEos) {
-		// display a splash message before the Eos connection is open
-		lcd.setCursor(0, 0);
-		lcd.print(String("Box X v" + VERSION_STRING).c_str());
-		lcd.setCursor(0, 1);
-		lcd.print("waiting for EOS...");
-		}
-	else {
-		// cue data
-		lcd.setCursor(0, 0);
-		lcd.write(uint8_t(0)); // special char up arrow
-		lcd.setCursor(0, 1);
-		lcd.write(uint8_t(1)); // special char down arrow
-		lcd.setCursor(2, 0);
-		lcd.print(activeCue.cue);
-		lcd.setCursor(6, 0);
-		lcd.print(activeCue.label.substring(0, 8)); // max 6 chars
-		lcd.setCursor(15, 0);
-		lcd.print(activeCue.progress);
-		lcd.setCursor(2, 1);
-		lcd.print(pendingCue.cue);
-		lcd.setCursor(6, 1);
-		lcd.print(pendingCue.label.substring(0, 8)); // max 6 chars
-		lcd.setCursor(15, 1);
-		lcd.print(pendingCue.duration);
-		// encoder data
-		lcd.setCursor(0, 2);
-		if (parameter[idx].displayName == 0) lcd.print(parameter[idx].name);
-		else lcd.print(parameter[idx].displayName);
-		lcd.setCursor(10, 2);
-		if (parameter[idx + 1].displayName == 0) lcd.print(parameter[idx + 1].name);
-		else lcd.print(parameter[idx + 1].displayName);
-		lcd.setCursor(0, 3);
-		lcd.print(parameter[idx].value, SIG_DIGITS);
-		lcd.setCursor(10, 3);
-		lcd.print(parameter[idx + 1].value, SIG_DIGITS);
-		}
-	updateDisplay = false;
-	}
-
-/**
- * @brief 
- * Here we setup our encoder, lcd, and various input devices. We also prepare
+ * @brief Here we setup our encoder, lcd, and various input devices. We also prepare
  * to communicate OSC with Eos by setting up SLIPSerial. Once we are done with
  * setup() we pass control over to loop() and never call setup() again.
  *
@@ -429,30 +299,30 @@ void displayStatus() {
  * 
  */
 void setup() {
-	// Ethernet init
-	Ethernet.begin(mac, localIP, subnet);
-  udp.begin(localPort);
-	// LCD init
-	lcd.createChar(0, upArrow);
-	lcd.createChar(1, downArrow);
+	SLIPSerial.begin(115200);
+	// This is a hack around an Arduino bug. It was taken from the OSC library examples
+	#ifdef BOARD_HAS_USB_SERIAL
+		#ifndef TEENSYDUINO
+			while (!SerialUSB);
+		#endif
+	#else
+		while (!Serial);
+	#endif
+
 	lcd.begin(LCD_CHARS, LCD_LINES);
 	lcd.clear();
-	// eOS init
+
 	initEOS(); // for hotplug with Arduinos without native USB like UNO
 	shiftButton(SHIFT_BTN);
-	encoder1.button(ENC_1_BTN);
-	encoder2.button(ENC_2_BTN);
 	encoder1.parameter(parameter[idx].name);
 	encoder2.parameter(parameter[idx + 1].name);
 	initControlButton(&parameterUp, PARAM_UP_BTN, UP);
 	initControlButton(&parameterDown, PARAM_DOWN_BTN, DOWN);
-
 	displayStatus();
 	}
 
 /**
- * @brief 
- * Here we service, monitor, and otherwise control all our peripheral devices.
+ * @brief Here we service, monitor, and otherwise control all our peripheral devices.
  * First, we retrieve the status of our encoders and buttons and update Eos.
  * Next, we check if there are any OSC messages for us.
  * Finally, we update our display (if an update is necessary)
@@ -468,19 +338,17 @@ void loop() {
 	// Check for hardware updates
 	updateControlButton(&parameterUp);
 	updateControlButton(&parameterDown);
-	go.update();
-	back.update();
-	selectLast.update();
 	encoder1.update();
 	encoder2.update();
 
 	// Then we check to see if any OSC commands have come from Eos
 	// and update the display accordingly.
-	size = udp.parsePacket();
+	size = SLIPSerial.available();
 	if (size > 0) {
 		// Fill the msg with all of the available bytes
-		while (size--) curMsg += (char)(udp.read());
-		//}
+		while (size--) curMsg += (char)(SLIPSerial.read());
+		}
+	if (SLIPSerial.endofPacket()) {
 		parseOSCMessage(curMsg);
 		lastMessageRxTime = millis();
 		// We only care about the ping if we haven't heard recently
@@ -502,7 +370,7 @@ void loop() {
 		// double check that it's still there, but only once after 2.5s have passed
 		if (!timeoutPingSent && diff > PING_AFTER_IDLE_INTERVAL) {
 			ping(PING_QUERY);
-			timeoutPingSent = true;	
+			timeoutPingSent = true;
 			}
 		}
 	if (updateDisplay) displayStatus();

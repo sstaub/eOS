@@ -75,6 +75,7 @@ const String VERSION_STRING = "2.0.0.0";
 #define PING_AFTER_IDLE_INTERVAL		2500
 #define TIMEOUT_AFTER_IDLE_INTERVAL	5000
 
+// Definition of the parameter you want to use
 const String ENCODER_1_PARAMETER = "Pan";
 const String ENCODER_2_PARAMETER = "Tilt";
 
@@ -91,9 +92,9 @@ struct Parameter {
 	} enc1, enc2;
 
 // Hardware constructors
+EOS eos;
 LiquidCrystal lcd(LCD_RS, LCD_ENABLE, LCD_D4, LCD_D5, LCD_D6, LCD_D7); // rs, enable, d4, d5, d6, d7
 
-// 
 Key next(NEXT_BTN, "NEXT");
 Key last(LAST_BTN, "LAST");
 Encoder encoder1(ENC_1_A, ENC_1_B, FORWARD);

@@ -102,9 +102,6 @@ Is a small faderwing with 6 faders and 12 buttons for Stop / Go
 ## macrobox
 Is a box with 12 buttons to fire Macros, actual 101 thru 112 but this can easily changed.
 
-## cuebox
-Is a simple box which shows you the active and pending cue and have buttons for GO and BACK/STOP. There is a parser for the cue text who gives you access to the different parts of the message.
-
 ## #lighthack
 Is a project folder for use with PlatformIO and includes the box1 code as a starting point.
 

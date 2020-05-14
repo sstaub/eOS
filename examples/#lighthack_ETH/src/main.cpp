@@ -32,7 +32,6 @@ THE SOFTWARE.
 #include "Ethernet3.h"
 #include "EthernetUdp3.h"
 
-
 // Hardware pins
 #define LCD_RS				2
 #define LCD_ENABLE		3
@@ -74,7 +73,7 @@ const String PING_QUERY = "box_x_eth_hello";
 const String PARAMETER_QUERY = "/eos/out/param/";
 
 // See displayScreen() below - limited to 10 chars (after 6 prefix chars)
-const String VERSION_STRING = "1.0.0.0";
+const String VERSION_STRING = "2.0.0.0";
 
 // Change these values to alter how long we wait before sending an OSC ping
 // to see if Eos is still there, and then finally how long before we
@@ -196,6 +195,47 @@ Encoder encoder2(ENC_2_A, ENC_2_B, FORWARD);
 // Local functions
 
 /**
+ * @brief Shows a splah screen and the begiining or if there is no communication
+ * 
+ */
+void splashScreen() {
+	lcd.setCursor(0, 0);
+	lcd.print(String("Box X v" + VERSION_STRING).c_str());
+	lcd.setCursor(0, 1);
+	lcd.print("waiting for EOS...");
+	lcd.setCursor(0, 2);
+	lcd.print("IP: ");
+	lcd.print(localIP);
+	lcd.setCursor(0, 3);
+	lcd.print("Port: ");
+	lcd.print(localPort);
+	}
+
+/**
+ * @brief Init the console, gives back a handshake reply
+ * and send the filters and subscribtions.
+ *
+ */
+void initEOS() {
+	filter("/eos/out/param/*");
+	filter("/eos/out/ping");
+	filter("/eos/out/active/cue/text");
+	filter("/eos/out/pending/cue/text");
+	subscribe(parameter[idx].name);
+	subscribe(parameter[idx + 1].name);
+	}
+
+/**
+ * @brief This helper first unsubribe all parameters and subscribe the new ones
+ * 
+ */
+void parameterUpdate() {
+	unSubscribe("*");
+	subscribe(parameter[idx].name);
+	subscribe(parameter[idx + 1].name);
+	}
+
+/**
  * @brief Parser for cue text
  * 
  * @param data 
@@ -228,30 +268,6 @@ void parseCueMessage(struct CueData *data, String msg) {
     data->label = msg.substring(firstSpace + 1, lastSpace);
     }
   }
-
-/**
- * @brief Init the console, gives back a handshake reply
- * and send the filters and subscribtions.
- *
- */
-void initEOS() {
-	filter("/eos/out/param/*");
-	filter("/eos/out/ping");
-	filter("/eos/out/active/cue/text");
-	filter("/eos/out/pending/cue/text");
-	subscribe(parameter[idx].name);
-	subscribe(parameter[idx + 1].name);
-	}
-
-/**
- * @brief This helper first unsubribe all parameters and subscribe the new ones
- * 
- */
-void parameterUpdate() {
-	unSubscribe("*");
-	subscribe(parameter[idx].name);
-	subscribe(parameter[idx + 1].name);
-	}
 
 /**
  * @brief Get the text message of the active cue
@@ -380,10 +396,7 @@ void displayStatus() {
 
 	if (!connectedToEos) {
 		// display a splash message before the Eos connection is open
-		lcd.setCursor(0, 0);
-		lcd.print(String("Box X v" + VERSION_STRING).c_str());
-		lcd.setCursor(0, 1);
-		lcd.print("waiting for EOS...");
+		splashScreen();
 		}
 	else {
 		// cue data
@@ -429,14 +442,16 @@ void displayStatus() {
  * 
  */
 void setup() {
-	// Ethernet init
-	Ethernet.begin(mac, localIP, subnet);
-  udp.begin(localPort);
 	// LCD init
 	lcd.createChar(0, upArrow);
 	lcd.createChar(1, downArrow);
 	lcd.begin(LCD_CHARS, LCD_LINES);
 	lcd.clear();
+	splashScreen();
+	// Ethernet init
+	Ethernet.begin(mac, localIP, subnet);
+  while(!udp.begin(localPort));
+	
 	// eOS init
 	initEOS(); // for hotplug with Arduinos without native USB like UNO
 	shiftButton(SHIFT_BTN);
@@ -446,8 +461,6 @@ void setup() {
 	encoder2.parameter(parameter[idx + 1].name);
 	initControlButton(&parameterUp, PARAM_UP_BTN, UP);
 	initControlButton(&parameterDown, PARAM_DOWN_BTN, DOWN);
-
-	displayStatus();
 	}
 
 /**

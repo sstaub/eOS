@@ -21,10 +21,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-// put 100nF ceramic capitors between ground and the input of the buttons and encoders
+/*
+Note: Updated once per second.
+“/eos/out/active/cue/<cue list number>/<cue number>”, <float argument with percent complete (0.0-1.0)>
+• “/eos/out/active/cue”, <float argument with percent complete (0.0-1.0)>
+• “/eos/out/active/cue/text”, <string argument with descriptive text about the active cue, ex: “1/ 2.3 Label 0:05 75%”>
+• “/eos/out/pending/cue/<cue list number>/<cue number>”
+• “/eos/out/pending/cue/text”, <string argument with descriptive text about the pending cue, ex: “1/2.4 Label 0:30”>
+*/
 
 // libraries included
-
 #include "Arduino.h"
 #include <LiquidCrystal.h>
 #include <OSCMessage.h>
@@ -49,21 +55,14 @@ THE SOFTWARE.
 #define LCD_D6				6
 #define LCD_D7				7
 
-#define ENC_1_A				A0
-#define ENC_1_B				A1
-#define ENC_2_A				A2
-#define ENC_2_B				A3
-
-#define NEXT_BTN			8
-#define LAST_BTN			9
-#define SHIFT_BTN			10
-
-#define SIG_DIGITS		3 // Number of significant digits displayed
+#define GO_BTN				8
+#define BACK_BTN			9
 
 const String HANDSHAKE_QUERY = "ETCOSC?";
 const String HANDSHAKE_REPLY = "OK";
-const String PING_QUERY = "box1x_hello";
-const String PARAMETER_QUERY = "/eos/out/param/";
+const String PING_QUERY = "cuebox2_hello";
+const String CUE_ACTIVE_QUERY = "/eos/out/active/cue/text";
+const String CUE_PENDING_QUERY = "/eos/out/pending/cue/text";
 
 // See displayScreen() below - limited to 10 chars (after 6 prefix chars)
 const String VERSION_STRING = "2.0.0.0";
@@ -75,31 +74,84 @@ const String VERSION_STRING = "2.0.0.0";
 #define PING_AFTER_IDLE_INTERVAL		2500
 #define TIMEOUT_AFTER_IDLE_INTERVAL	5000
 
-const String ENCODER_1_PARAMETER = "Pan";
-const String ENCODER_2_PARAMETER = "Tilt";
-
 // Global variables
 bool updateDisplay = false;
 bool connectedToEos = false;
 unsigned long lastMessageRxTime = 0;
 bool timeoutPingSent = false;
 
-struct Parameter {
-	String name;
-	String displayName;
-	float value;
-	} enc1, enc2;
+struct CueData {
+  String cuelist;
+  String cue;
+  String label;
+  String duration;
+  String progress;
+  }activeCue, pendingCue;
+
+// special chars
+uint8_t upArrow[8] = {  
+  B00100,
+  B01010,
+  B10001,
+  B00100,
+  B00100,
+  B00100,
+	B00000,
+	};
+
+uint8_t downArrow[8] = {
+	B00000,
+  B00100,
+  B00100,
+  B00100,
+  B10001,
+  B01010,
+  B00100,
+	};
+
 
 // Hardware constructors
+EOS eos;
 LiquidCrystal lcd(LCD_RS, LCD_ENABLE, LCD_D4, LCD_D5, LCD_D6, LCD_D7); // rs, enable, d4, d5, d6, d7
 
-// 
-Key next(NEXT_BTN, "NEXT");
-Key last(LAST_BTN, "LAST");
-Encoder encoder1(ENC_1_A, ENC_1_B, FORWARD);
-Encoder encoder2(ENC_2_A, ENC_2_B, FORWARD);
+Key go(GO_BTN, "GO_0");
+Key back(BACK_BTN, "STOP");
 
 // Local functions
+
+/**
+ * @brief Parser for cue text
+ * 
+ * @param data 
+ * @param msg 
+ */
+void parseCueMessage(struct CueData *data, String msg) {
+  uint8_t size = msg.length();
+  uint8_t firstSpace = msg.indexOf(" ");
+  uint8_t cueSeparator = msg.indexOf("/");
+  uint8_t lastSpace = msg.lastIndexOf(" ");
+  
+  if (cueSeparator < firstSpace && cueSeparator != 0) { // there is an cue separator
+    data->cuelist = msg.substring(0, cueSeparator);
+    data->cue = msg.substring(cueSeparator + 1, firstSpace);
+    }
+  else {
+    data->cuelist = String();
+    data->cue = msg.substring(0, firstSpace);
+    }
+  
+  if (msg[size - 1] == '%') { // check if active or peding cue, only active cues have a progress counter in %
+    data->progress = msg.substring(lastSpace + 1);
+    uint8_t durSpace = msg.lastIndexOf(" ", lastSpace - 1);
+    data->duration = msg.substring(durSpace + 1, lastSpace);
+    data->label = msg.substring(firstSpace + 1, durSpace);
+    }
+  else {
+    data->progress = String();
+    data->duration = msg.substring(lastSpace + 1);
+    data->label = msg.substring(firstSpace + 1, lastSpace);
+    }
+  }
 
 /**
  * @brief Init the console, gives back a handshake reply
@@ -108,29 +160,36 @@ Encoder encoder2(ENC_2_A, ENC_2_B, FORWARD);
  */
 void initEOS() {
 	SLIPSerial.print(HANDSHAKE_REPLY);
-	filter("/eos/out/param/*");
+	filter("/eos/out/active/cue/text");
+	filter("/eos/out/pending/cue/text");
 	filter("/eos/out/ping");
-	subscribe(ENCODER_1_PARAMETER);
-	subscribe(ENCODER_2_PARAMETER);
 	}
 
 /**
- * @brief 
- * Given a valid OSCMessage (relevant to Pan/Tilt), we update our Encoder struct
- * with the new valueition information.
+ * @brief Get the text message of the active cue
  * 
- * @param msg - the OSC message we will use to update our internal data
- * @param addressOffset - unused (allows for multiple nested roots)
+ * @param msg OSC message
+ * @param addressOffset 
  */
-void parseEnc1Update(OSCMessage& msg, int addressOffset) {
-	enc1.value = msg.getOSCData(0)->getFloat();
-	connectedToEos = true; // Update this here just in case we missed the handshake
+void activeCueUpdate(OSCMessage& msg, int addressOffset) {
+	char text[msg.getDataLength(0)];
+	msg.getString(0, text);
+	parseCueMessage(&activeCue, text);
+	connectedToEos = true;
 	updateDisplay = true; 
 	}
 
-void parseEnc2Update(OSCMessage& msg, int addressOffset) {
-	enc2.value = msg.getOSCData(0)->getFloat();
-	connectedToEos = true; // Update this here just in case we missed the handshake
+/**
+ * @brief Get the text message of the pending cue
+ * 
+ * @param msg OSC message
+ * @param addressOffset 
+ */
+void pendingCueUpdate(OSCMessage& msg, int addressOffset) {
+	char text[msg.getDataLength(0)];
+	msg.getString(0, text);
+	parseCueMessage(&pendingCue, text);
+	connectedToEos = true;
 	updateDisplay = true;
 	}
 
@@ -151,13 +210,14 @@ void parseOSCMessage(String& msg) {
 		connectedToEos = true;
 		updateDisplay = true;
 		}
+
 	else {
 		// Prepare the message for routing by filling an OSCMessage object with our message string
 		OSCMessage oscmsg;
 		oscmsg.fill((uint8_t*)msg.c_str(), (int)msg.length());
-		// Route parameter messages to the relevant update function
-		oscmsg.route((PARAMETER_QUERY + ENCODER_1_PARAMETER).c_str(), parseEnc1Update);
-		oscmsg.route((PARAMETER_QUERY + ENCODER_2_PARAMETER).c_str(), parseEnc2Update);
+		// Route cue messages to the relevant update function
+		oscmsg.route("/eos/out/active/cue/text", activeCueUpdate);
+		oscmsg.route("/eos/out/pending/cue/text", pendingCueUpdate);
 		}
 	}
 
@@ -172,19 +232,27 @@ void displayStatus() {
 	if (!connectedToEos) {
 		// display a splash message before the Eos connection is open
 		lcd.setCursor(0, 0);
-		lcd.print(String("Box1 X v" + VERSION_STRING).c_str());
+		lcd.print(String("Cuebox v" + VERSION_STRING).c_str());
 		lcd.setCursor(0, 1);
 		lcd.print("waiting for EOS");
 		}
 	else {
 		lcd.setCursor(0, 0);
-		lcd.print(ENCODER_1_PARAMETER);
-		lcd.setCursor(8, 0);
-		lcd.print(ENCODER_2_PARAMETER);
+		lcd.write(uint8_t(0)); // special char up arrow
 		lcd.setCursor(0, 1);
-		lcd.print(enc1.value, SIG_DIGITS);
-		lcd.setCursor(8, 1);
-		lcd.print(enc2.value, SIG_DIGITS);
+		lcd.write(uint8_t(1)); // special char down arrow
+		lcd.setCursor(2, 0);
+		lcd.print(activeCue.cue);
+		lcd.setCursor(5, 0);
+		lcd.print(activeCue.label.substring(0, 6)); // max 6 chars
+		lcd.setCursor(12, 0);
+		lcd.print(activeCue.progress);
+		lcd.setCursor(2, 1);
+		lcd.print(pendingCue.cue);
+		lcd.setCursor(5, 1);
+		lcd.print(pendingCue.label.substring(0, 6)); // max 6 chars
+		lcd.setCursor(12, 1);
+		lcd.print(pendingCue.duration);
 		}
 	updateDisplay = false;
 	}
@@ -211,13 +279,12 @@ void setup() {
 		while (!Serial);
 	#endif
 
+	lcd.createChar(0, upArrow);
+	lcd.createChar(1, downArrow);
 	lcd.begin(LCD_CHARS, LCD_LINES);
 	lcd.clear();
 
 	initEOS(); // for hotplug with Arduinos without native USB like UNO
-	shiftButton(SHIFT_BTN);
-	encoder1.parameter(ENCODER_1_PARAMETER);
-	encoder2.parameter(ENCODER_2_PARAMETER);
 
 	displayStatus();
 	}
@@ -238,10 +305,8 @@ void loop() {
 	int size;
 
 	// Check for hardware updates
-	next.update();
-	last.update();
-	encoder1.update();
-	encoder2.update();
+	go.update();
+	back.update();
 
 	// Then we check to see if any OSC commands have come from Eos
 	// and update the display accordingly.
