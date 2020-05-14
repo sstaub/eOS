@@ -3,6 +3,8 @@ An object orientated library for Arduino to control ETCs EOS Family Consoles wit
 
 The library depends on:
 - the OSC library from CNMAT https://github.com/CNMAT/OSC
+
+For use with Ethernet
 - an Arduino compatible Ethernet library like Ethernet3 https://github.com/sstaub/Ethernet3
 - optional for Teensy MAC address https://github.com/sstaub/TeensyID
 
@@ -10,15 +12,14 @@ This library and examples are a replacment for the #lighthack project, it uses E
 The in the examples used Ethernet library only supports the Wiznet 5500 chip, used on Ethernet Shield 2 or the popular USR-ES1 module which you can buy for a small pice at aliexpress.com
 
 Future:
-- Add support for STM32duino boards like the NUCLEO-F767ZI and the coming Teensy 4.1 will follow later. 
-- Also some parsers for extracting implicit OSC outputs, like Wheel, Softkey ...
+- Parsers for extracting implicit OSC outputs, like Wheel, Softkey ...
 - Adding new control elements for Softkey and Parameter Selection.
 - TCP is not possible in the moment, because there is no further development of the original CNMAT library. Maybe I use my own OSC library for sending data.
 
 The library support hardware elements like encoders, fader, buttons with some helper functions. The library allows you to use hardware elements as an object and with the use of the helper functions, code becomes much easier to write and read and to understand. 
 Please refer to the EOS manual for more information about OSC.
 
-For use with PlatformIO https://platformio.org, as a recommanded IDE with MS VSCode, there is an extra start example folder called **#lighthack**.
+For use with PlatformIO https://platformio.org, as a recommanded IDE with MS VSCode, there is an extra start example folder called **#lighthack** and **#lighthack_ETH**.
 
 If you have whishes for other functions or classes make an issue. If you find bugs also, nobody is perfect.
 
@@ -29,8 +30,10 @@ EOS eos;
 ```
 
 ## Ethernet configuration and initialization
-Before using Ethernet there a some things that must be done
-1. Import the necessary #defines
+The Ethernet functionality is now independent from the hardware port (e.g. WIFI or other Ethernet hardware than WizNet W5500) and libraries. Behind the scenes it uses the virtual Arduino UDP class.
+
+Before using Ethernet there a some things that must be done. It can be different between the diverse libraries.
+1. Import the necessary #defines e.g.
 ```
 #include "Ethernet3.h"
 #include "EthernetUdp3.h"
@@ -59,12 +62,12 @@ uint16_t eosPort = 8000; // on this port EOS listen for data
 3. You need an EOS and UDP constructor, must done befor setup(), don't change the name of the constructor
 ```
 EthernetUDP udp;
-EOS eos(eosIP, eosPort);
+EOS eos(udp, eosIP, eosPort);
 ```
-4. In the beginning of setup() you must start network services
+4. In the beginning of setup() you must start network services.
 ```
 Ethernet.begin(mac, localIP, subnet);
-udp.begin(localPort);
+while(!udp.begin(localPort)); // wait for a connection
 ```
 
 ## Installation
@@ -173,6 +176,8 @@ The **initFaders()** function is basic configuration and must use before you can
 
 ### **EOS**
 Eos is the main class and must init before you can use this library. The constructor name is fixed! You can use any UDP communication you want including WIFI. Beware of the different methods of initializing the interfaces.
+
+**!!!** The class name **eos** is fixed and can’t changed in the moment **!!!**
 ```
 EOS(UDP &udp, IPAddress ip, uint16_t port, interface_t interface = EOSUDP); // used for Ethernet
 EOS(interface_t interface = EOSUSB); // used for USB
@@ -195,8 +200,8 @@ void EOS::sendOSC(OSCMessage& msg, IPAddress ip, uint16_t port);
 It is a part of the EOS main class and send an OSC Message, depending on the choosen interface.
 Example, this function can called inside setup() or loop() after init the interface.
 ```
-eos.sendOSC();
-eos.sendOSC(ip, port);
+eos.sendOSC(message);
+eos.sendOSC(message, ip, port);
 ```
 
 ### **OscButton**
@@ -212,13 +217,10 @@ OscButton(uint8_t pin, String pattern);
 
 For Ethernet UDP
 ```
-OscButton(uint8_t pin, String pattern, int32_t integer32, IPAddress ip = eosIP, uint16_t port = eosPort);
-
-OscButton(uint8_t pin, String pattern, float float32, IPAddress ip = eosIP, uint16_t port = eosPort);
-
-OscButton(uint8_t pin, String pattern, String message, IPAddress ip = eosIP, uint16_t port = eosPort);
-
-OscButton(uint8_t pin, String pattern, IPAddress ip = eosIP, uint16_t port = eosPort);
+OscButton(uint8_t pin, String pattern, int32_t integer32, IPAddress ip, uint16_t port);
+OscButton(uint8_t pin, String pattern, float float32, IPAddress ip, uint16_t port);
+OscButton(uint8_t pin, String pattern, String message, IPAddress ip, uint16_t port);
+OscButton(uint8_t pin, String pattern, IPAddress ip, uint16_t port);
 ```
 - **pin** the connection Pin for the button hardware
 - **pattern** the OSC address pattern
@@ -234,7 +236,7 @@ OscButton pingButton(8 , "/eos/ping", "hello EOS");
 ```
 Example for Ethernet UDP, this should done before the setup()
 ```
-IPAddress qlabIP(10, 101, 1, 101); // IP of QLab computer
+IPAddress qlabIP(10, 101, 1, 101); // IP of QLab
 uint16_t qlabPort = 53000; // QLab receive port
 OscButton qlabGo(8 , "/go", qlabIP, qlabPort);
 ```
@@ -266,8 +268,8 @@ void button(uint8_t buttonPin, ButtonMode buttonMode = HOME);
 - **buttonPin** is the pin for the extra button
 - **buttonMode** is the function you can assign, following functions are available
 
-	-	HOME this will post a home command
-	- FINE this allows you to use the button as a **Shift** function
+	- HOME will post a home command of the parameter
+	- FINE allows you to use the button as a **Shift** function
 
 Example, this must happen in the setup() before assigning a Parameter
 ```
@@ -383,11 +385,16 @@ macro1.update();
 
 ### **Submaster**
 This class allows you to control a submaster with a hardware (slide) potentiometer as a fader.
-The fader is a linear 10kOhm, from Bourns or ALPS and can be 45/60/100mm long Put 10nF ceramic capitors between ground and fader levelers to prevent analog noise. **Additional Advices:**
-**Arduino UNO, MEGA:**
+
+The fader is a linear 10kOhm, from Bourns or ALPS and can be 45/60/100mm long. Put a 10nF ceramic capitor between ground and fader leveler to prevent analog noise.
+
+**Additional Advices**
+
+**Arduino UNO, MEGA**
 use IOREF instead +5V to the top (single pin) of the fader (100%)
 GND to the center button pin (2 pins, the outer pin is normaly for the leveler) of the fader (0%)
-**TEENSY:**
+
+**TEENSY**
 +3.3V to the top (single pin) of the fader (100%)
 use ANALOG GND instead the normal GND to the center button pin (2 pins, the outer pin is normaly for the leveler) of the fader (0%)
 
