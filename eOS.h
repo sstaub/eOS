@@ -1,5 +1,5 @@
 /*
-eOS library for Ethernet code is placed under the MIT license
+eOS library for USB and Ethernet UDPis placed under the MIT license
 Copyright (c) 2020 Stefan Staub
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
