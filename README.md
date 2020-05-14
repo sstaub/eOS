@@ -24,7 +24,7 @@ For use with PlatformIO https://platformio.org, as a recommanded IDE with MS VSC
 If you have whishes for other functions or classes make an issue. If you find bugs also, nobody is perfect.
 
 ## USB configuration and initialization
-Before using USB one things that must be extra done. You must add a constructor for init the library. This must done befor setup(), don't change the name of the constructor!
+Before using USB one things that must be extra done. You must add a constructor for init the library. This must done before setup(), don't change the name of the constructor!
 ```
 EOS eos;
 ```
