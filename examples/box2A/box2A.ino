@@ -58,6 +58,8 @@ THE SOFTWARE.
 #define PARAM_DOWN_BTN	9
 #define SHIFT_BTN				10
 
+int LED_Pin = 13
+
 
 #define SIG_DIGITS			3 // Number of significant digits displayed
 
@@ -183,6 +185,7 @@ void displayStatus() {
 		lcd.print(String("Box2A v" + VERSION_STRING).c_str());
 		lcd.setCursor(0, 1);
 		lcd.print("waiting for EOS");
+		ditalWrite(LED_Pin, LOW);
 		}
 	else {
 		lcd.setCursor(0, 0);
@@ -195,6 +198,7 @@ void displayStatus() {
 		lcd.print(parameter[idx].value, SIG_DIGITS);
 		lcd.setCursor(8, 1);
 		lcd.print(parameter[idx + 1].value, SIG_DIGITS);
+		digitalWrite(LED_Pin, HIGH);
 		}
 	updateDisplay = false;
 	}
@@ -318,6 +322,7 @@ void setup() {
 	encoder2.parameter(parameter[idx + 1].name);
 	initControlButton(&parameterUp, PARAM_UP_BTN, UP);
 	initControlButton(&parameterDown, PARAM_DOWN_BTN, DOWN);
+	pinMode(LED_Pin, OUTPUT)
 	displayStatus();
 	}
 
