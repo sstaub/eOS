@@ -58,6 +58,8 @@ THE SOFTWARE.
 #define LAST_BTN			9
 #define SHIFT_BTN			10
 
+int LED_Pin = 13
+
 #define SIG_DIGITS		3 // Number of significant digits displayed
 
 const String HANDSHAKE_QUERY = "ETCOSC?";
@@ -176,6 +178,7 @@ void displayStatus() {
 		lcd.print(String("Box1 X v" + VERSION_STRING).c_str());
 		lcd.setCursor(0, 1);
 		lcd.print("waiting for EOS");
+		digitalWrite(LED_Pin, LOW);
 		}
 	else {
 		lcd.setCursor(0, 0);
@@ -186,6 +189,7 @@ void displayStatus() {
 		lcd.print(enc1.value, SIG_DIGITS);
 		lcd.setCursor(8, 1);
 		lcd.print(enc2.value, SIG_DIGITS);
+		digitalWrite(LED_Pin, HIGH);
 		}
 	updateDisplay = false;
 	}
@@ -219,6 +223,8 @@ void setup() {
 	shiftButton(SHIFT_BTN);
 	encoder1.parameter(ENCODER_1_PARAMETER);
 	encoder2.parameter(ENCODER_2_PARAMETER);
+
+	pinMode(LED_Pin, OUTPUT)
 
 	displayStatus();
 	}
