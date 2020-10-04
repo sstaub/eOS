@@ -34,6 +34,8 @@ THE SOFTWARE.
 
 
 // Hardware pins
+
+//LCD Pins
 #define LCD_RS				2
 #define LCD_ENABLE		3
 #define LCD_D4				4
@@ -41,6 +43,7 @@ THE SOFTWARE.
 #define LCD_D6				6
 #define LCD_D7				7
 
+//Encoder Pins
 #define ENC_1_A					A0
 #define ENC_1_B					A1
 #define ENC_2_A					A2
@@ -48,6 +51,7 @@ THE SOFTWARE.
 #define ENC_1_BTN				A4
 #define ENC_2_BTN				A5
 
+//BTN Asignments
 #define PARAM_UP_BTN		A8
 #define PARAM_DOWN_BTN	A9
 #define SEL_LAST_BTN		A10
@@ -55,6 +59,9 @@ THE SOFTWARE.
 #define GO_BTN					A11
 #define BACK_BTN				A12
 #define SHIFT_BTN				A13
+
+//LED Pin Asignment
+int LED_Pin= 13
 
 // constants and macros
 #define LCD_CHARS				20
@@ -384,6 +391,8 @@ void displayStatus() {
 		lcd.print(String("Box X v" + VERSION_STRING).c_str());
 		lcd.setCursor(0, 1);
 		lcd.print("waiting for EOS...");
+		// LED disable
+		digitalWrite(LED_Pin, LOW)
 		}
 	else {
 		// cue data
@@ -414,6 +423,8 @@ void displayStatus() {
 		lcd.print(parameter[idx].value, SIG_DIGITS);
 		lcd.setCursor(10, 3);
 		lcd.print(parameter[idx + 1].value, SIG_DIGITS);
+		// LED enable
+		digitalWrite(LED_Pin,HIGH);
 		}
 	updateDisplay = false;
 	}
@@ -446,6 +457,8 @@ void setup() {
 	encoder2.parameter(parameter[idx + 1].name);
 	initControlButton(&parameterUp, PARAM_UP_BTN, UP);
 	initControlButton(&parameterDown, PARAM_DOWN_BTN, DOWN);
+	// LED init
+	pinMode(LED_Pin, OUTPUT);
 
 	displayStatus();
 	}
