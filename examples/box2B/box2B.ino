@@ -63,6 +63,8 @@ THE SOFTWARE.
 #define NEXT_BTN				12
 #define SELECT_LAST_BTN	13
 
+int LED_Pin = 13
+
 #define SIG_DIGITS			3 // Number of significant digits displayed
 
 // number of encoders you use
@@ -191,8 +193,10 @@ void displayStatus() {
 		lcd.print(String("Box2B v" + VERSION_STRING).c_str());
 		lcd.setCursor(0, 1);
 		lcd.print("waiting for EOS");
+		digitalWrite(LED_Pin, LOW);
 		}
 	else {
+		digitalWrite(LED_Pin,HIGH);
 		lcd.setCursor(0, 0);
 		if (parameter[idx].displayName == 0) lcd.print(parameter[idx].name);
 		else lcd.print(parameter[idx].displayName);
@@ -328,6 +332,7 @@ void setup() {
 	encoder2.parameter(parameter[idx + 1].name);
 	initControlButton(&parameterUp, PARAM_UP_BTN, UP);
 	initControlButton(&parameterDown, PARAM_DOWN_BTN, DOWN);
+	pinMode(LED_Pin, OUTPUT)
 	displayStatus();
 	}
 
