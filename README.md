@@ -4,17 +4,31 @@ An object orientated library for Arduino to control ETCs EOS Family Consoles wit
 The library depends on:
 - the OSC library from CNMAT https://github.com/CNMAT/OSC
 
-For use with Ethernet
-- an Arduino compatible Ethernet library like Ethernet3 https://github.com/sstaub/Ethernet3
-- optional for Teensy MAC address https://github.com/sstaub/TeensyID
+## Ethernet Usage
 
 This library and examples are a replacment for the #lighthack project, it uses Ethernet instead of USB so the library does not depend on the board type.
 The in the examples used Ethernet library only supports the Wiznet 5500 chip, used on Ethernet Shield 2 or the popular USR-ES1 module which you can buy for a small pice at aliexpress.com
 
-Future:
+**Following libraries must downloaded for use with Ethernet
+!!! Beware, the Ethernet libraries have different init procedures !!!**
+
+**WIZNet w5500 boards like Ethernet Shield 2**
+- an Arduino compatible Ethernet library like Ethernet3 https://github.com/sstaub/Ethernet3
+- optional for Teensy MAC address https://github.com/sstaub/TeensyID
+
+**Teensy 4.1 with buildin Ethernet**
+- https://github.com/vjmuzik/NativeEthernet
+- https://github.com/vjmuzik/FNET
+
+**STM32duino (https://github.com/stm32duino)**
+- https://github.com/stm32duino/STM32Ethernet
+- https://github.com/stm32duino/LwIP
+
+## Plans for Future versions:
 - Parsers for extracting implicit OSC outputs, like Wheel, Softkey ...
 - Adding new control elements for Softkey and Parameter Selection.
 - TCP is not possible in the moment, because there is no further development of the original CNMAT library. Maybe I use my own OSC library for sending data.
+- library for MBED
 
 The library support hardware elements like encoders, fader, buttons with some helper functions. The library allows you to use hardware elements as an object and with the use of the helper functions, code becomes much easier to write and read and to understand. 
 Please refer to the EOS manual for more information about OSC.
