@@ -99,6 +99,7 @@ Fader fader6(FADER_6_LEVELER, FADER_6_FIRE_BUTTON, FADER_6_STOP_BUTTON, 6, FADER
 void initEOS() {
 	SLIPSerial.print(HANDSHAKE_REPLY);
 	filter("/eos/out/ping");
+	initFaders(FADER_PAGE, NUMBER_OF_FADERS, FADER_BANK);
 	}
 
 /**
@@ -146,7 +147,6 @@ void setup() {
 	#endif
 
 	initEOS(); // for hotplug with Arduinos without native USB like UNO
-	initFaders(FADER_PAGE, NUMBER_OF_FADERS, FADER_BANK);
 	}
 
 /**
