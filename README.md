@@ -16,11 +16,13 @@ The in the examples used Ethernet library only supports the Wiznet 5500 chip, us
 - an Arduino compatible Ethernet library like Ethernet3 https://github.com/sstaub/Ethernet3
 - optional for Teensy MAC address https://github.com/sstaub/TeensyID
 
-**Teensy 4.1 with buildin Ethernet**
+**Teensy 4.1 with buildin Ethernet**<br>
+**!!! This doesn't work in the moment because of a bug with the Arduino String library in conjuction with the NativeEthernet libray**
 - https://github.com/vjmuzik/NativeEthernet
 - https://github.com/vjmuzik/FNET
 
-**STM32duino (https://github.com/stm32duino)**
+**STM32duino (https://github.com/stm32duino)**<br>
+**!!! This works not as ecpected, there is a bug in the LWIP libray which is causing a massive lost of packages**
 - https://github.com/stm32duino/STM32Ethernet
 - https://github.com/stm32duino/LwIP
 
