@@ -35,11 +35,11 @@ Please refer to the EOS manual for more information about OSC.
 
 For use with PlatformIO https://platformio.org, as a recommanded IDE with MS VSCode, there is an extra start example folder called **#lighthack** and **#lighthack_ETH**.
 
-If you have whishes for other functions or classes make an issue. If you find bugs also, nobody is perfect.
+If you have wishes for other functions or classes make an issue. If you find bugs also, nobody is perfect.
 
 ## USB configuration and initialization
 Before using USB one things that must be extra done. You must add a constructor for init the library. This must done before setup(), don't change the name of the constructor!
-```
+```cpp
 EOS eos;
 ```
 
@@ -48,10 +48,12 @@ The Ethernet functionality is now independent from the hardware port (e.g. WIFI 
 
 Before using Ethernet there a some things that must be done. It can be different between the diverse libraries.
 1. Import the necessary #defines e.g.
-```
+
+```cpp
 #include "Ethernet3.h"
 #include "EthernetUdp3.h"
 ```
+
 2. You need to define IP addresses and ports 
 
 - **mac** - You need a unique MAC address, for Teensy you can use the TeensyID library on this GitHub site
@@ -62,7 +64,7 @@ Before using Ethernet there a some things that must be done. It can be different
 - **eosPort** - This is the destination port of the EOS console
 The EOS constructor name **eos** is fixed, don't change them!
 
-```
+```cpp
 // configuration example, must done before setup()
 uint8_t mac[] = {0x90, 0xA2, 0xDA, 0x10, 0x14, 0x48};
 IPAddress localIP(10, 101, 1, 201);
@@ -72,9 +74,11 @@ uint16_t localPort = 8001; // on this port Arduino listen for data
 IPAddress eosIP(10, 101, 1, 100);
 uint16_t eosPort = 8000; // on this port EOS listen for data
 // in EOS Setup > System > Showcontrol > OSC > OSC UDP RX Port
+
 ```
 3. You need an EOS and UDP constructor, must done before setup(), don't change the name of the constructor
-```
+
+```cpp
 EthernetUDP udp;
 EOS eos(udp, eosIP, eosPort);
 ```
