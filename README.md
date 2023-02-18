@@ -6,8 +6,8 @@ The library depends on:
 
 ## Ethernet Usage
 
-This library and examples are a replacment for the #lighthack project, it uses Ethernet instead of USB so the library does not depend on the board type.
-The in the examples used Ethernet library only supports the Wiznet 5500 chip, used on Ethernet Shield 2 or the popular USR-ES1 module which you can buy for a small pice at aliexpress.com
+This library and examples are a replacement for the #lighthack project, it uses Ethernet instead of USB so the library does not depend on the board type.
+The in the examples used Ethernet library only supports the WIZnet 5500 chip, used on Ethernet Shield 2 or the popular USR-ES1 module which you can buy for a small pice at aliexpress.com
 
 **Following libraries must downloaded for use with Ethernet
 !!! Beware, the Ethernet libraries have different init procedures !!!**
@@ -17,7 +17,7 @@ The in the examples used Ethernet library only supports the Wiznet 5500 chip, us
 - optional for Teensy MAC address https://github.com/sstaub/TeensyID
 
 **Teensy 4.1 with buildin Ethernet**<br>
-**!!! This doesn't work in the moment because of a bug with the Arduino String library in conjuction with the NativeEthernet libray**
+**!!! This doesn't work in the moment because of a bug with the Arduino String library in conjunction with the NativeEthernet libray**
 - https://github.com/vjmuzik/NativeEthernet
 - https://github.com/vjmuzik/FNET
 
@@ -25,6 +25,37 @@ The in the examples used Ethernet library only supports the Wiznet 5500 chip, us
 **!!! This works not as ecpected, there is a bug in the LWIP libray which is causing a massive lost of packages**
 - https://github.com/stm32duino/STM32Ethernet
 - https://github.com/stm32duino/LwIP
+
+## Hardware
+The library support hardware elements like encoders, faders, buttons with some helper functions. The library allows you to use hardware elements as an object and with the use of the helper functions, code becomes much easier to write and read and to understand.
+- **Buttons**
+	You can use every momentary push button on the market, e.g. MX Keys, the keys are available with different push characters and have therefore different color markers. One pin must connect to a Digital Pin D*n* the other to ground.<br>
+	**! A 100nF capacitor is recommended between the button pins !**<br>
+- **Faders**
+  Recommended are linear faders with 10k Ohm from **Bourns** or **ALPS** which are available in different lengths and qualities.<br>
+	Beware that ARM boards like STM32-Nucleo or Teensy 4.x use 3.3V, classic AVR boards like Arduino UNO use 5V. The leveler must connect to the Analog Pin A*n*. The other pins must connect to ground and 3.3V or 5V.<br>
+	**! A 10nF capacitor is recommended between leveler and ground !**<br>
+
+- **Rotary Encoders**
+  You can use encoders from **ALPS** or equivalent.
+	The middle pin of the encoders must connect to ground, the both other pins A/B must connect to Digital Pins D*n*.<br>
+  **! Two 100nF capacitors are recommended between the button pin A/B and ground !**<br>
+
+### Additional Advices for Analog Pins
+The most problems comes from bad grounding and cables that are to long,
+on PCB's the shielding design is very important.
+
+- **Arduino UNO, MEGA with WIZnet 5500**
+Use AREF Pin instead +5V to the top (single pin) of the fader (100%).
+Use GND next to AREF and connect to the center button pin (2 pins, the outer pin is normally for the leveler) of the fader (0%)
+
+- **STM32-Nucleo**
+use IOREF Pin instead +3.3V to the top (single pin) of the fader (100%).
+GND to the center button pin (2 pins, the outer pin is normally for the leveler) of the fader (0%).
+
+- **TEENSY 3.x with WIZnet 5500**
++3.3V to the top (single pin) of the fader (100%)
+use ANALOG GND instead the normal GND to the center button pin (2 pins, the outer pin is normally for the leveler) of the fader (0%).
 
 ## Plans for Future versions:
 - Parsers for extracting implicit OSC outputs, like Wheel, Softkey ...
@@ -35,7 +66,7 @@ The in the examples used Ethernet library only supports the Wiznet 5500 chip, us
 The library support hardware elements like encoders, fader, buttons with some helper functions. The library allows you to use hardware elements as an object and with the use of the helper functions, code becomes much easier to write and read and to understand. 
 Please refer to the EOS manual for more information about OSC.
 
-For use with PlatformIO https://platformio.org, as a recommanded IDE with MS VSCode, there is an extra start example folder called **#lighthack** and **#lighthack_ETH**.
+For use with PlatformIO https://platformio.org, as a recommended IDE with MS VSCode, there is an extra start example folder called **#lighthack** and **#lighthack_ETH**.
 
 If you have wishes for other functions or classes make an issue. If you find bugs also, nobody is perfect.
 
@@ -61,7 +92,7 @@ Before using Ethernet there a some things that must be done. It can be different
 - **mac** - You need a unique MAC address, for Teensy you can use the TeensyID library on this GitHub site
 - **localIP** - You need a static IP address for your Arduino in the subnet range of network system
 - **subnet** - A subnet range is necessary
-- **localPort** - This is the destinitaion port of your Arduino
+- **localPort** - This is the destination port of your Arduino
 - **eosIP** - This is the console IP address
 - **eosPort** - This is the destination port of the EOS console
 The EOS constructor name **eos** is fixed, don't change them!
@@ -111,7 +142,7 @@ Because of the limited RAM of the Arduino UNO, the parameter list is limited and
 On an Arduino UNO the maximum is 14 parameter names.
 On an Arduino MEGA more than 14 parameters can be used, also on other boards like Teensy 3.x or 4.
 For Teensy you need to fake the PID/VID of the USB connection to work with a console, have a look to the forum.
-Added a keyword „none“ for gaps in the parameter list, former titeled as „empty“.
+Added a keyword „none“ for gaps in the parameter list, former titled as „empty“.
 
 ## box2B
 This box uses 6 buttons for Next, Last, SelectLast, Shift and Parameter Up/Down. It also uses the buttons of the encoder for posting the Home position. So, all Pins of an Arduino UNO are used.
@@ -147,7 +178,7 @@ With a Filter you can get messages from the console which you can use for procee
 void subscribe(String parameter);
 void unSubscribe(String parameter); // unsubscribe a parameter
 ```
-With subscribtions you can get special informations about dedicated parameters.
+With subscriptions you can get special informations about dedicated parameters.
 
 ### **Ping**
 ```
@@ -155,13 +186,13 @@ void ping(); // send a ping without a message
 void ping(String message); // send a ping with a message 
 ```
 
-With a ping you can get a reaction from the console which helps you to indentify your box and if is alive. You should send a ping regulary with message to identify your box on the console.
+With a ping you can get a reaction from the console which helps you to identify your box and if is alive. You should send a ping regularly with message to identify your box on the console.
 
 
 ### **Command Line**
 ```
 void command(String cmd); // send a command
-void newCommand(String newCmd); // clears cmd line before applyieng
+void newCommand(String newCmd); // clears cmd line before applying
 ```
 You can send a string to the command line.
 
@@ -217,7 +248,7 @@ EOS eos;
 void EOS::sendOSC(OSCMessage& msg);
 void EOS::sendOSC(OSCMessage& msg, IPAddress ip, uint16_t port);
 ```
-It is a part of the EOS main class and send an OSC Message, depending on the choosen interface.
+It is a part of the EOS main class and send an OSC Message, depending on the chosen interface.
 Example, this function can called inside setup() or loop() after init the interface.
 ```
 eos.sendOSC(message);
@@ -225,7 +256,7 @@ eos.sendOSC(message, ip, port);
 ```
 
 ### **OscButton**
-With this new class you can create generic buttons which allows you to control other OSC compatible software in the network like QLab. The class initializer is overloaded to allow sending different OSC data types: Interger 32 bit, Float, Strings or no data.
+With this new class you can create generic buttons which allows you to control other OSC compatible software in the network like QLab. The class initializer is overloaded to allow sending different OSC data types: Integer 32 bit, Float, Strings or no data.
 
 For USB
 ```
@@ -281,7 +312,7 @@ Example, this should done before the setup()
 ```
 Encoder encoder1(A0, A1, REVERSE);
 ```
-If the Encoder have an extro button build in, you can add it with following class member:
+If the Encoder have an extra button build in, you can add it with following class member:
 ```
 void button(uint8_t buttonPin, ButtonMode buttonMode = HOME);
 ```
@@ -406,7 +437,7 @@ macro1.update();
 ### **Submaster**
 This class allows you to control a submaster with a hardware (slide) potentiometer as a fader.
 
-The fader is a linear 10kOhm, from Bourns or ALPS and can be 45/60/100mm long. Put a 10nF ceramic capitor between ground and fader leveler to prevent analog noise.
+The fader is a linear 10kOhm, from Bourns or ALPS and can be 45/60/100mm long. Put a 10nF ceramic capacitor between ground and fader leveler to prevent analog noise.
 
 **Additional Advices**
 
@@ -416,7 +447,7 @@ GND to the center button pin (2 pins, the outer pin is normaly for the leveler) 
 
 **TEENSY**
 +3.3V to the top (single pin) of the fader (100%)
-use ANALOG GND instead the normal GND to the center button pin (2 pins, the outer pin is normaly for the leveler) of the fader (0%)
+use ANALOG GND instead the normal GND to the center button pin (2 pins, the outer pin is normally for the leveler) of the fader (0%)
 
 ```
 Submaster(uint8_t analogPin, uint8_t firePin, uint8_t sub);
